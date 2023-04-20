@@ -918,6 +918,7 @@ name = "web-dev-bastian-gruber"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "tokio",
  "warp",
 ]
