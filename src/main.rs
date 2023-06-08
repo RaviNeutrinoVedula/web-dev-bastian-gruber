@@ -7,6 +7,7 @@ use warp::{http::Method, Filter};
 mod routes;
 mod types;
 mod store;
+mod profanity;
 
 #[tokio::main]
 async fn main() {
@@ -28,6 +29,7 @@ async fn main() {
     tracing_subscriber::fmt()
     // Use the filter we built above to determine which traces to record.
         .with_env_filter(log_filter)
+    //    .with(log_filter)	
     // Record an event when each span closes. This can be used to time our routes' durations!
         .with_span_events(FmtSpan::CLOSE)
         .init();
