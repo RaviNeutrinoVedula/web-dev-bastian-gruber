@@ -5,6 +5,7 @@ use handle_errors::Error;
 use crate::types::{
     answer::{Answer, AnswerId, NewAnswer},
     question::{Question, QuestionId, NewQuestion},
+    account::Account,
 };
 
 #[derive(Debug, Clone)]
@@ -27,7 +28,7 @@ impl Store {
     }
 
     pub async fn get_questions(
-	&self,
+	self,
 	limit: Option<u32>,
 	offset: u32
     ) -> Result<Vec<Question>, Error> {
@@ -51,7 +52,7 @@ impl Store {
     }
 
     pub async fn add_question(
-	&self,
+	self,
 	new_question: NewQuestion
     ) -> Result<Question, Error> {
 	match sqlx::query("INSERT into questions(title, content, tags) VALUES ($1, $2, $3)")
@@ -75,12 +76,12 @@ impl Store {
     }
 
     pub async fn update_question (
-	&self,
+	self,
 	question: Question,
 	question_id: i32
     ) -> Result<Question, Error> {
 	match sqlx::query(
-	"UPDATE quesions
+	"UPDATE questions
          SET title = $1, content = $2, tags = $3
          WHERE id = $4
          RETURNING id, title, content, tags"
@@ -106,7 +107,7 @@ impl Store {
     }
 
     pub async fn delete_question (
-	&self,
+	self,
 	question_id: i32,
     ) -> Result<bool, Error> {
 	match sqlx::query("DELETE FROM questions where id = $1")
@@ -122,7 +123,7 @@ impl Store {
     }
 
     pub async fn add_answer (
-	&self,
+	self,
 	new_answer: NewAnswer
     ) -> Result<Answer, Error> {
 	match sqlx::query(
@@ -143,5 +144,41 @@ impl Store {
 		    Err(Error::DatabaseQueryError)
 		},
 	    }
-    }		
+    }
+
+    pub async fn add_account(
+	self,
+	account: Account
+    ) -> Result<bool, Error> {
+	match sqlx::query(
+	    "INSERT INTO accounts (email, password) VALUES($1, $2)")
+	    .bind(account.email)
+	    .bind(account.password)
+	    .execute(&self.connection)
+	    .await {
+		Ok(_) => Ok(true),
+		Err(error) => {
+		    tracing::event!(
+			tracing::Level::ERROR,
+			code = error
+			    .as_database_error()
+			    .unwrap()
+			    .code()
+			    .unwrap()
+			    .parse::<i32>()
+			    .unwrap(),
+			db_message = error
+			    .as_database_error()
+			    .unwrap()
+			    .message(),
+			constraint = error
+			    .as_database_error()
+			    .unwrap()
+			    .constraint()
+			    .unwrap()
+		    );
+		    Err(Error::DatabaseQueryError)
+		}
+	    }
+    }
 }
