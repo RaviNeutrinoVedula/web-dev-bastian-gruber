@@ -16,7 +16,8 @@ async fn main() {
 	    "handle_errors=warn,practical_rust_book=warn,warp=warn".to_owned()
 	});
 
-    let store = store::Store::new("postgres://postgres:mgrd4f@localhost:5432/rustwebdev")
+    // let store = store::Store::new("postgres://postgres:mgrd4f@localhost:5432/rustwebdev")
+    let store = store::Store::new("postgres://postgres:postgres@localhost:5432/rustwebdev")	
         .await;
 
     sqlx::migrate!()

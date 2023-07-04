@@ -16,7 +16,7 @@ use reqwest::Error as ReqwestError;
 pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
-    DatabaseQueryError,
+    DatabaseQueryError(sqlx::Error),
     ExternalAPIError(ReqwestError),
     ClientError(APILayerError),
     ServerError(APILayerError),
@@ -39,7 +39,7 @@ impl std::fmt::Display for Error {
         match &*self {
             Error::ParseError(ref err) => write!(f, "Cannot parse parameter: {}", err),
             Error::MissingParameters => write!(f, "Missing parameter"),
-	    Error::DatabaseQueryError => write!(f, "Cannot update, invalid data."),
+	    Error::DatabaseQueryError(_) => write!(f, "Cannot update, invalid data."),
 	    Error::ExternalAPIError(err) => write!(f, "Cannot execute: {}", err),
 	    Error::ClientError(err) => write!(f, "External Client error: {}", err),
 	    Error::ServerError(err) => write!(f, "External Server error: {}", err),
@@ -50,14 +50,40 @@ impl std::fmt::Display for Error {
 impl Reject for Error {}
 impl Reject for APILayerError {}
 
+const DUPLICATE_KEY: u32 = 23505;
+
 #[instrument]
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
-    if let Some(crate::Error::DatabaseQueryError) = r.find() {
+    if let Some(crate::Error::DatabaseQueryError(e)) = r.find() {
 	event!(Level::ERROR, "Database query error");
-        Ok(warp::reply::with_status(
-	    crate::Error::DatabaseQueryError.to_string(),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ))
+
+	match e {
+	    sqlx::Error::Database(err) => {
+		if err.code().unwrap().parse::<u32>().unwrap() == DUPLICATE_KEY {
+		    Ok(warp::reply::with_status(
+			"Account already exists".to_string(),
+			StatusCode::UNPROCESSABLE_ENTITY,
+		    ))
+		} else {
+		    Ok(warp::reply::with_status(
+			"Cannot update data".to_string(),
+			StatusCode::UNPROCESSABLE_ENTITY,
+		    ))
+		}
+	    },
+	    _ => {
+		Ok(warp::reply::with_status(
+		    "Cannot update data".to_string(),
+		    StatusCode::UNPROCESSABLE_ENTITY,
+		))
+	    }
+	}
+
+	// -- previous code when we were'nt capturing the DB-error-type for deeper inspection
+        // Ok(warp::reply::with_status(
+	//     crate::Error::DatabaseQueryError.to_string(),
+        //     StatusCode::UNPROCESSABLE_ENTITY,
+        // ))
     } else if let Some(error) = r.find::<CorsForbidden>() {
 	event!(Level::ERROR, "CORS forbidden error: {}", error);
         Ok(warp::reply::with_status(
