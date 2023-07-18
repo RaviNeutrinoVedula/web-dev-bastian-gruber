@@ -3,12 +3,16 @@ use warp::http::StatusCode;
 use crate::store::Store;
 use crate::types::answer::NewAnswer;
 use crate::profanity::check_profanity;
+use crate::types::account::Session;
 
 pub async fn add_answer(
+    session: Session,
     store: Store,
     new_answer: NewAnswer,
 ) -> Result<impl warp::Reply, warp::Rejection> {
 
+    let account_id = session.account_id;
+    
     let content = match
 	check_profanity(new_answer.content)
 	.await {
@@ -21,7 +25,7 @@ pub async fn add_answer(
 	question_id: new_answer.question_id,
     };
     
-    match store.add_answer(answer)
+    match store.add_answer(answer, account_id)
         .await {
 	    Ok(_) => Ok(warp::reply::with_status(
 		"Answer added",

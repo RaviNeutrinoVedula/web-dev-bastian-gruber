@@ -18,6 +18,8 @@ pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
     WrongPassword,
+    CannotDecryptToken,
+    Unauthorized,
     ArgonLibraryError(ArgonError),
     DatabaseQueryError(sqlx::Error),
     ExternalAPIError(ReqwestError),
@@ -43,6 +45,8 @@ impl std::fmt::Display for Error {
             Error::ParseError(ref err) => write!(f, "Cannot parse parameter: {}", err),
             Error::MissingParameters => write!(f, "Missing parameter"),
 	    Error::WrongPassword => write!(f, "Wrong password"),
+	    Error::CannotDecryptToken => write!(f, "Cannot decrypt token error"),
+	    Error::Unauthorized => write!(f, "No permission to change the underlying resource"),
 	    Error::ArgonLibraryError(_) => write!(f, "Cannot verify password"),
 	    Error::DatabaseQueryError(_) => write!(f, "Cannot update, invalid data."),
 	    Error::ExternalAPIError(err) => write!(f, "Cannot execute: {}", err),
@@ -130,6 +134,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
 	Ok(warp::reply::with_status(
 	    "Internal Server Error".to_string(),
 	    StatusCode::INTERNAL_SERVER_ERROR,
+	))
+    } else if let Some(crate::Error::Unauthorized) = r.find() {
+	event!(Level::ERROR, "Not matching account id");
+	Ok(warp::reply::with_status(
+	    "No permission to change underlying resource".to_string(),
+	    StatusCode::UNAUTHORIZED,
 	))
     } else {
 	event!(Level::WARN, "Requested route was not found");
